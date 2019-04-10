@@ -129,7 +129,7 @@ func inputProcessConn(
 				return true
 			}
 
-			if !filter.Contains(util.IPv4Src(buff)) {
+			if !filter.Contains(util.IPv4Dst(buff)) {
 				return false
 			}
 

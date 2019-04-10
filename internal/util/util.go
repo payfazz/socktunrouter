@@ -21,11 +21,6 @@ func IPVersion(b *buffer.Buff) int {
 	return int(b.Data[0] >> 4)
 }
 
-// IPv4Src .
-func IPv4Src(b *buffer.Buff) net.IP {
-	return net.IP(b.Data[12:16])
-}
-
 // IPv4Dst .
 func IPv4Dst(b *buffer.Buff) net.IP {
 	return net.IP(b.Data[16:20])

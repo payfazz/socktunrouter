@@ -17,7 +17,7 @@ import (
 )
 
 func outputMain(infLog, errLog *log.Logger, done done.Done, tunDev *os.File, config *config.Config) error {
-	outputRouter := newOutputRouter(done)
+	outputRouter := newOutputRouter()
 
 	for _, item := range config.Output {
 		if item.Sock == "" {
@@ -36,7 +36,7 @@ func outputMain(infLog, errLog *log.Logger, done done.Done, tunDev *os.File, con
 			return errors.New("filter is not IPv4:" + filter.IP.String())
 		}
 
-		outputRouter.router = append(outputRouter.router, newOutputWriter(errLog, filter, item.Sock, done))
+		outputRouter.add(newOutputWriter(errLog, filter, item.Sock, done))
 	}
 
 	go func() {
@@ -117,6 +117,19 @@ func (o *outputWriter) setWorker(w *writerworker.Worker) {
 	o.Unlock()
 }
 
+func (o *outputWriter) casWorker(old, new *writerworker.Worker) bool {
+	var ret bool
+	o.Lock()
+	if o.worker == old {
+		o.worker = new
+		ret = true
+	} else {
+		ret = false
+	}
+	o.Unlock()
+	return ret
+}
+
 func (o *outputWriter) write(buff *buffer.Buff) {
 	w := o.getWorker()
 
@@ -128,11 +141,9 @@ func (o *outputWriter) write(buff *buffer.Buff) {
 	// discard buff
 	buffer.Put(buff)
 
-	if o.done.IsDone() {
+	if !o.casWorker(nil, dummyWriter) {
 		return
 	}
-
-	o.setWorker(dummyWriter)
 
 	go func() {
 		conn, err := net.Dial("unix", o.sock)
@@ -163,46 +174,73 @@ func (o *outputWriter) write(buff *buffer.Buff) {
 type outputRouter struct {
 	sync.RWMutex
 	router []*outputWriter
-	data   map[uint32]*outputWriter
-	done   done.Done
+	cache  map[uint32]*outputRouterEntry
 }
 
-func newOutputRouter(done done.Done) *outputRouter {
+type outputRouterEntry struct {
+	sync.RWMutex
+	value *outputWriter
+	exp   time.Time
+}
+
+func (o *outputRouterEntry) expired() bool {
+	o.RLock()
+	ret := o.exp.Before(time.Now())
+	o.RUnlock()
+	return ret
+}
+
+func (o *outputRouterEntry) extend() {
+	o.Lock()
+	o.exp = time.Now().Add(5 * time.Minute)
+	o.Unlock()
+}
+
+func newOutputRouter() *outputRouter {
 	return &outputRouter{
-		data: make(map[uint32]*outputWriter),
-		done: done,
+		cache: make(map[uint32]*outputRouterEntry),
 	}
+}
+
+func (o *outputRouter) add(w *outputWriter) {
+	o.Lock()
+	o.router = append(o.router, w)
+	o.Unlock()
 }
 
 func (o *outputRouter) getWriter(ip net.IP) *outputWriter {
 	ipnumber := uint32(ip[0])<<24 | uint32(ip[1])<<16 | uint32(ip[2])<<8 | uint32(ip[3])<<0
 
-	var ret *outputWriter
-
 	o.RLock()
-	ret, ok := o.data[ipnumber]
+	cacheLen := len(o.cache)
+	ret, ok := o.cache[ipnumber]
 	o.RUnlock()
 	if ok {
-		return ret
+		if ret.expired() {
+			if cacheLen > 2<<10 {
+				o.Lock()
+				delete(o.cache, ipnumber)
+				o.Unlock()
+			} else {
+				ret.extend()
+			}
+		}
+		return ret.value
 	}
 
-	ret = nil
-	for _, r := range o.router {
-		if r.filter.Contains(ip) {
-			ret = r
+	var w *outputWriter
+	o.Lock()
+	for _, v := range o.router {
+		if v.filter.Contains(ip) {
+			w = v
 			break
 		}
 	}
+	ret = &outputRouterEntry{value: w}
+	ret.extend()
 
-	o.Lock()
-	o.data[ipnumber] = ret
+	o.cache[ipnumber] = ret
 	o.Unlock()
-	go func() {
-		util.Sleep(5*time.Minute, o.done)
-		o.Lock()
-		delete(o.data, ipnumber)
-		o.Unlock()
-	}()
 
-	return ret
+	return ret.value
 }

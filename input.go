@@ -98,7 +98,7 @@ func inputProcessConn(
 		buff, buffConsumed := buffer.Get(), false
 		shouldBreak := func() bool {
 			var err error
-			_, err = io.ReadFull(buffConn, buff.Data[:20])
+			buff.Len, err = io.ReadFull(buffConn, buff.Data[:20])
 			if allDone.IsDone() {
 				return true
 			}

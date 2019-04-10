@@ -1,6 +1,8 @@
 package buffer
 
 import (
+	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -8,6 +10,19 @@ import (
 type Buff struct {
 	Len  int
 	Data [1 << 16]byte
+}
+
+func (b *Buff) String() string {
+	var sb strings.Builder
+	sb.WriteString("[")
+	for i := 0; i < b.Len; i++ {
+		if i != 0 {
+			sb.WriteString(",")
+		}
+		sb.WriteString(fmt.Sprintf("0x%02x", b.Data[i]))
+	}
+	sb.WriteString("]")
+	return sb.String()
 }
 
 var pool = sync.Pool{

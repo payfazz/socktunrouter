@@ -230,6 +230,9 @@ func (o *outputRouter) getWriter(ip net.IP) *outputWriter {
 
 	var w *outputWriter
 	o.Lock()
+	if ret, ok := o.cache[ipnumber]; ok {
+		return ret.value
+	}
 	for _, v := range o.router {
 		if v.filter.Contains(ip) {
 			w = v

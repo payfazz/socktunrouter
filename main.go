@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"sync"
@@ -25,18 +24,18 @@ func main() {
 	})
 
 	if len(os.Args) != 2 {
-		errors.Fail(fmt.Sprintf("Usage: %s <config.yml>", os.Args[0]), nil)
+		errors.Fail(errors.Errorf("Usage: %s <config.yml>", os.Args[0]))
 	}
 
 	config, err := config.Parse(os.Args[1])
-	errors.WrapAndCheck(err)
+	errors.Check(errors.Wrap(err))
 
 	if config.TunName == "" {
-		errors.Fail("tun name cannot be empty", nil)
+		errors.Fail(errors.Errorf("tun name cannot be empty"))
 	}
 
 	tunDev, err := tun.Open(config.TunName)
-	errors.WrapAndCheck(err)
+	errors.Check(errors.Wrap(err))
 	defer tunDev.Close()
 
 	if tunDev.Name() != config.TunName {
@@ -84,5 +83,5 @@ func main() {
 	done.Done()
 
 	wg.Wait()
-	errors.WrapAndCheck(err)
+	errors.Check(errors.Wrap(err))
 }

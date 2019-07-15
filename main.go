@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/payfazz/go-errors"
+	"github.com/payfazz/go-errors/errhandler"
 
 	"github.com/payfazz/socktunrouter/internal/config"
 	"github.com/payfazz/socktunrouter/internal/done"
@@ -18,24 +19,24 @@ func main() {
 	infLog := log.New(os.Stdout, "INF: ", log.LstdFlags)
 	errLog := log.New(os.Stdout, "ERR: ", log.LstdFlags)
 
-	defer errors.HandleWith(func(err error) {
+	defer errhandler.With(func(err error) {
 		errLog.Println(errors.Format(err))
 		os.Exit(1)
 	})
 
 	if len(os.Args) != 2 {
-		errors.Fail(errors.Errorf("Usage: %s <config.yml>", os.Args[0]))
+		errhandler.Fail(errors.Errorf("Usage: %s <config.yml>", os.Args[0]))
 	}
 
 	config, err := config.Parse(os.Args[1])
-	errors.Check(errors.Wrap(err))
+	errhandler.Check(errors.Wrap(err))
 
 	if config.TunName == "" {
-		errors.Fail(errors.Errorf("tun name cannot be empty"))
+		errhandler.Fail(errors.Errorf("tun name cannot be empty"))
 	}
 
 	tunDev, err := tun.Open(config.TunName)
-	errors.Check(errors.Wrap(err))
+	errhandler.Check(errors.Wrap(err))
 	defer tunDev.Close()
 
 	if tunDev.Name() != config.TunName {
@@ -83,5 +84,5 @@ func main() {
 	done.Done()
 
 	wg.Wait()
-	errors.Check(errors.Wrap(err))
+	errhandler.Check(errors.Wrap(err))
 }

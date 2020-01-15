@@ -25,14 +25,14 @@ func main() {
 	})
 
 	if len(os.Args) != 2 {
-		errhandler.Fail(errors.Errorf("Usage: %s <config.yml>", os.Args[0]))
+		errhandler.Check(errors.Errorf("Usage: %s <config.yml>", os.Args[0]))
 	}
 
 	config, err := config.Parse(os.Args[1])
 	errhandler.Check(errors.Wrap(err))
 
 	if config.TunName == "" {
-		errhandler.Fail(errors.Errorf("tun name cannot be empty"))
+		errhandler.Check(errors.Errorf("tun name cannot be empty"))
 	}
 
 	tunDev, err := tun.Open(config.TunName)
